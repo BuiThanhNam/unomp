@@ -504,26 +504,33 @@ var pool = module.exports = function pool(options, authorizeFn){
         var batchRpcCalls = [
             ['validateaddress', [options.address]],
             ['getdifficulty', []],
-            ['getinfo', []],
+            
             ['getmininginfo', []],
             ['submitblock', []]
         ];
+       
+        
+        
+                if (options.coin.hasGetInfo) {
+            batchRpcCalls.push(['getinfo', []]);
+        } else {
+            batchRpcCalls.push(['getblockchaininfo', []], ['getnetworkinfo', []]);
+        }
         _this.daemon.batchCmd(batchRpcCalls, function(error, results){
             if (error || !results){
-                console.log(results)
                 emitErrorLog('Could not start pool, error with init batch RPC call: ' + JSON.stringify(error));
                 return;
             }
 
             var rpcResults = {};
 
-            for (var i = 0; i < results.length; i++){
+            for (var i = 0; i < results.length; i++) {
                 var rpcCall = batchRpcCalls[i][0];
                 var r = results[i];
                 rpcResults[rpcCall] = r.result || r.error;
-                if (rpcCall !== 'submitblock' && (r.error || !r.result)){
+
+                if (rpcCall !== 'submitblock' && (r.error || !r.result)) {
                     emitErrorLog('Could not start pool, error with init RPC ' + rpcCall + ' - ' + JSON.stringify(r.error));
-                    console.log(rpcResults[rpcCall])
                     return;
                 }
             }
@@ -557,12 +564,18 @@ var pool = module.exports = function pool(options, authorizeFn){
                 }
             })();
 
-            options.testnet = rpcResults.getinfo.testnet;
-            options.protocolVersion = rpcResults.getinfo.protocolversion;
+            options.testnet = options.coin.hasGetInfo ? rpcResults.getinfo.testnet : (rpcResults.getblockchaininfo.chain === 'test') ? true : false;
+
+            options.protocolVersion = options.coin.hasGetInfo ? rpcResults.getinfo.protocolversion : rpcResults.getnetworkinfo.protocolversion;
+
+            var difficulty = options.coin.hasGetInfo ? rpcResults.getinfo.difficulty : rpcResults.getblockchaininfo.difficulty;
+            if (typeof(difficulty) == 'object') {
+                difficulty = difficulty['proof-of-work'];
+            }
 
             options.initStats = {
-                connections: rpcResults.getinfo.connections,
-                difficulty: rpcResults.getinfo.difficulty * algos[options.coin.algorithm].multiplier,
+                connections: (options.coin.hasGetInfo ? rpcResults.getinfo.connections : rpcResults.getnetworkinfo.connections),
+                difficulty: difficulty * algos[options.coin.algorithm].multiplier,
                 networkHashRate: rpcResults.getmininginfo.networkhashps
             };
 
