@@ -1,0 +1,7 @@
+{
+    "name": "globaltoken-skein",
+    "symbol": "GTL",
+    "algorithm": "skein",
+    "peerMagic": "c708d32d",
+    "peerMagicTestnet": "3a6f375b"
+}
